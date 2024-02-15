@@ -1,0 +1,539 @@
+<html>
+<head>
+  <title>Snake Game</title>
+  <style>
+    #canvas {
+      border: 1px solid black;
+    }
+  </style>
+</head>
+<body>
+  <h1>Snake Game</h1>
+  <p>Use the arrow keys to control the blue snake and eat the green apples. Avoid the walls, your own body, and the red snakes. The game has 10 levels. The level and score are shown on the top left corner. Have fun!</p>
+  <canvas id="canvas"></canvas>
+  <script>
+        // Constants for the grid size, cell size, and colors
+        const GRID_SIZE = 20;
+        const CELL_SIZE = 20;
+        const EMPTY_COLOR = "white";
+        const SNAKE_COLOR = "blue";
+        const APPLE_COLOR = "green";
+        const ENEMIES_COLOR = ["red", "black", "pink", "brown", "orange", "purple", "cyan", "magenta", "lime", "yellow"];
+
+        // Variables for the canvas, context, and game loop
+        let canvas;
+        let ctx;
+        let interval;
+
+        // Variables for the game state
+        let snake; // An array of cells representing the blue snake
+        let direction; // The direction of the blue snake's movement
+        let apple; // A cell representing the green apple
+        let enemies; // An array of arrays of cells representing the red snakes
+        let enemiesLastDirections; // An array of strings representing the last direction of each red snake
+        let level; // The current level of the game
+        let score; // The current score of the game
+        let gameOver; // A boolean indicating whether the game is over or not
+
+        // Initialize the game
+        function init() {
+        // Get the canvas and context
+        canvas = document.getElementById("canvas");
+        ctx = canvas.getContext("2d");
+
+        // Set the canvas size
+        canvas.width = GRID_SIZE * CELL_SIZE;
+        canvas.height = GRID_SIZE * CELL_SIZE;
+
+        // Add event listeners for the arrow keys
+        document.addEventListener("keydown", handleKeydown);
+
+
+        // Initialize the game state
+        level = 1; // The current level of the game, starting at 1
+        score = 0; // The current score of the game, starting at 0
+        snake = [{x: 10, y: 10}]; // An array of cells representing the blue snake, starting at the center of the grid
+        enemies = []; // An array of arrays of cells representing the red snakes, starting as an empty array
+        direction = "right"; // The direction of the blue snake's movement, starting to the right
+        apple = getRandomEmptyCell(); // A cell representing the green apple, randomly placed on an empty cell
+        gameOver = false; // A boolean indicating whether the game is over or not, starting as false
+
+        // Add a red snake to the enemies array
+        let newEnemy = [];
+        let newEnemyHead = getRandomEmptyCell();
+        newEnemy.push(newEnemyHead);
+        enemies.push(newEnemy);
+        enemiesLastDirections= new Array(enemies.length).fill(null);
+
+
+        // Start the game loop
+        let interval = 100
+        interval = setInterval(update, interval);
+        }
+
+        // Handle the keydown event
+        function handleKeydown(event) {
+        // Get the key code
+        let keyCode = event.keyCode;
+
+        // Change the direction of the blue snake according to the key pressed
+        // Prevent the snake from moving in the opposite direction of its current movement
+        if (keyCode == 37 && direction != "right") {
+            // Left arrow
+            direction = "left";
+        } else if (keyCode == 38 && direction != "down") {
+            // Up arrow
+            direction = "up";
+        } else if (keyCode == 39 && direction != "left") {
+            // Right arrow
+            direction = "right";
+        } else if (keyCode == 40 && direction != "up") {
+            // Down arrow
+            direction = "down";
+        }
+        }
+
+        // Update the game state
+        function update() {
+        // Clear the canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Check if the game is over
+        if (gameOver) {
+            // Draw the game over message and score
+            ctx.fillStyle = "black";
+            ctx.font = "30px Arial";
+            ctx.textAlign = "center";
+            ctx.fillText("Game Over", canvas.width / 2, canvas.height / 2 - 50);
+            ctx.fillText("Score: " + score, canvas.width / 2, canvas.height / 2 + 50);
+
+            // Stop the game loop
+            clearInterval(interval);
+            return;
+        }
+
+        // Move the blue snake
+        moveSnake();
+
+        // Move the red snakes
+        moveEnemies();
+
+        // Check for collisions
+        checkCollisions();
+
+        // Draw the grid
+        drawGrid();
+
+        // Draw the blue snake
+        drawSnake();
+
+        // Draw the green apple
+        drawApple();
+
+        // Draw the red snakes
+        drawEnemies();
+
+        // Draw the level and score
+        drawInfo();
+        }
+
+        // Move the blue snake
+        function moveSnake() {
+        // Get the head of the blue snake
+        let head = snake[0];
+
+        // Get the next cell of the blue snake's movement according to the direction
+        let next;
+        if (direction == "left") {
+            next = { x: head.x - 1, y: head.y };
+        } else if (direction == "right") {
+            next = { x: head.x + 1, y: head.y };
+        } else if (direction == "up") {
+            next = { x: head.x, y: head.y - 1 };
+        } else if (direction == "down") {
+            next = { x: head.x, y: head.y + 1 };
+        }
+
+        // Add the next cell to the beginning of the blue snake array
+        snake.unshift(next);
+        }
+
+        function moveEnemies() {
+        // Loop through the enemies array
+        for (let i = 0; i < enemies.length; i++) {
+            // Get the current enemy
+            let enemy = enemies[i];
+
+            // Check if the enemy exists
+            if (!enemy) {
+            continue;
+            }
+
+            // Get the head of the current enemy
+            let head = enemy[0];
+
+            // Get a random direction for the current enemy's movement
+            // Avoid the walls, the enemy's own body, and the blue snake
+            let directions = [];
+
+            if (!head) {
+            continue;
+            }
+
+            if (head.x > 0 && !containsCell(enemy, { x: head.x - 1, y: head.y }) && !containsCell(snake, { x: head.x - 1, y: head.y })) {
+            directions.push("left");
+            }
+            if (head.x < GRID_SIZE - 1 && !containsCell(enemy, { x: head.x + 1, y: head.y }) && !containsCell(snake, { x: head.x + 1, y: head.y })) {
+            directions.push("right");
+            }
+            if (head.y > 0 && !containsCell(enemy, { x: head.x, y: head.y - 1 }) && !containsCell(snake, { x: head.x, y: head.y - 1 })) {
+            directions.push("up");
+            }
+            if (head.y < GRID_SIZE - 1 && !containsCell(enemy, { x: head.x, y: head.y + 1 }) && !containsCell(snake, { x: head.x, y: head.y + 1 })) {
+            directions.push("down");
+            }
+
+            let direction;
+            // If the last direction is still valid, use it
+            if (enemiesLastDirections[i] && directions.includes(enemiesLastDirections[i])) {
+            // Add a random chance to change direction
+            if (Math.random() < 0.2) { // 20% chance to change direction
+                direction = directions[Math.floor(Math.random() * directions.length)];
+                enemiesLastDirections[i] = direction;
+            } else {
+                direction = enemiesLastDirections[i];
+            }
+            } else {
+            // Otherwise, choose a new direction
+            direction = directions[Math.floor(Math.random() * directions.length)];
+            enemiesLastDirections[i] = direction;
+            }
+
+            // Get the next cell of the current enemy's movement according to the direction
+            let next;
+            if (direction == "left") {
+            next = { x: head.x - 1, y: head.y };
+            } else if (direction == "right") {
+            next = { x: head.x + 1, y: head.y };
+            } else if (direction == "up") {
+            next = { x: head.x, y: head.y - 1 };
+            } else if (direction == "down") {
+            next = { x: head.x, y: head.y + 1 };
+            }
+
+            // Add the next cell to the beginning of the current enemy array
+            enemy.unshift(next);
+        }
+        }
+
+
+        // Check for collisions
+        function checkCollisions() {
+        // Get the head of the blue snake
+        let head = snake[0];
+
+        // Check if the blue snake hits the wall
+        if (head.x < 0 || head.x >= GRID_SIZE || head.y < 0 || head.y >= GRID_SIZE) {
+            // Set the game over flag to true
+            gameOver = true;
+            return;
+        }
+
+        // Check if the blue snake hits its own body
+        for (let i = 1; i < snake.length; i++) {
+            if (head.x == snake[i].x && head.y == snake[i].y) {
+            // Set the game over flag to true
+            gameOver = true;
+            return;
+            }
+        }
+
+        // Check if the blue snake hits a red snake
+        for (let i = 0; i < enemies.length; i++) {
+            let enemy = enemies[i];
+
+            for (let j = 0; j < enemy.length; j++) {
+                if (!enemy[j]) {
+                    continue;
+                }
+                if (head.x == enemy[j].x && head.y == enemy[j].y) {
+                    // Set the game over flag to true
+                    gameOver = true;
+                    return;
+                }
+            }
+        }
+
+        // Check if the blue snake eats the green apple
+        if (head.x == apple.x && head.y == apple.y) {
+            // Increase the score by 1
+            score++;
+
+            // Check if the score is a multiple of 10
+            if (score % 3 == 0) {
+            // Increase the level by 1
+            level++;
+
+            // Reset the size of the blue snake to 1
+            snake = [snake[0]];
+            
+            // Add a new red snake to the enemies array
+            // The new red snake has a random position and size of 1
+            let newEnemy = [];
+            let newEnemyHead = getRandomEmptyCell();
+            newEnemy.push(newEnemyHead);
+            enemies.push(newEnemy);
+            }
+
+            // Place a new green apple on a random empty cell
+            apple = getRandomEmptyCell();
+
+            // Grow the blue snake and the red snakes by 1
+            // Do not remove the last cell of their arrays
+            growSnake();
+            //growEnemies();
+        } else {
+            // Remove the last cell of the blue snake array
+            snake.pop();
+            for (let i = 0; i < enemies.length; i++) {
+            enemies[i].pop();
+            }                
+            }
+        }
+
+        // Draw the grid
+        function drawGrid() {
+        // Loop through the rows and columns of the grid
+        for (let i = 0; i < GRID_SIZE; i++) {
+            for (let j = 0; j < GRID_SIZE; j++) {
+            // Draw a white rectangle for each cell
+            ctx.fillStyle = EMPTY_COLOR;
+            ctx.fillRect(i * CELL_SIZE, j * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+            }
+        }
+        }
+
+       // Draw the blue snake
+        function drawSnake() {
+            // Loop through the blue snake array
+            for (let i = 0; i < snake.length; i++) {
+                // Get the current cell
+                let cell = snake[i];
+
+                // Draw a blue rectangle for each cell
+                ctx.fillStyle = SNAKE_COLOR;
+                // If it is the first cell, make it darker
+                if (i == 0) {
+                ctx.fillStyle = "navy";
+                }
+                ctx.fillRect(cell.x * CELL_SIZE, cell.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+            }
+        }
+
+        // Draw the green apple
+        function drawApple() {
+        // Draw a green circle for the apple
+        ctx.fillStyle = APPLE_COLOR;
+        ctx.beginPath();
+        ctx.arc(apple.x * CELL_SIZE + CELL_SIZE / 2, apple.y * CELL_SIZE + CELL_SIZE / 2, CELL_SIZE / 2, 0, 2 * Math.PI);
+        ctx.fill();
+        }
+
+        // Draw the red snakes
+        function drawEnemies() {
+        // Loop through the enemies array
+        for (let i = 0; i < enemies.length; i++) {
+            // Get the current enemy
+            let enemy = enemies[i];
+
+            // Loop through the current enemy array
+            for (let j = 0; j < enemy.length; j++) {
+            // Get the current cell
+            let cell = enemy[j];
+            if (!cell) {
+                    continue;
+                }
+            // Draw a red rectangle for each cell
+            ctx.fillStyle = ENEMIES_COLOR[i];
+            ctx.fillRect(cell.x * CELL_SIZE, cell.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+            }
+        }
+        }
+
+        // Draw the level and score
+        function drawInfo() {
+        // Draw the level and score in black text
+        ctx.fillStyle = "black";
+        ctx.font = "20px Arial";
+        ctx.textAlign = "left";
+        ctx.fillText("Level: " + level, 10, 30);
+        ctx.fillText("Score: " + score, 10, 60);
+        }
+
+        // Get a random empty cell on the grid
+        function getRandomEmptyCell() {
+        // Loop until an empty cell is found
+        while (true) {
+            // Generate a random row and column
+            let row = Math.floor(Math.random() * GRID_SIZE);
+            let col = Math.floor(Math.random() * GRID_SIZE);
+
+            // Create a cell object
+            let cell = { x: row, y: col };
+
+            // Check if the cell is valid and empty
+            if (cell && isEmptyCell(cell)  && !isNearSnakeHead(cell)) {
+            // Return the cell
+            return cell;
+            }
+        }
+        }
+
+        function isNearSnakeHead(cell) {
+            let head = snake[0];
+
+            // Check if the cell is within a distance of 3 from the snake's head
+            return Math.abs(cell.x - head.x) <= 3 && Math.abs(cell.y - head.y) <= 3;
+        }
+
+        // Check if a cell is empty
+        function isEmptyCell(cell) {
+        // Check if the cell is occupied by the blue snake
+        if (containsCell(snake, cell)) {
+            return false;
+        }
+
+        // Check if the cell is occupied by the green apple
+        if (apple && cell.x == apple.x && cell.y == apple.y) {
+            return false;
+        }
+
+        // Check if the cell is occupied by any of the red snakes
+        if (enemies){
+            for (let i = 0; i < enemies.length; i++) {
+                let enemy = enemies[i];
+                if (containsCell(enemy, cell)) {
+                return false;
+                }
+            }
+        }
+
+        // If none of the above conditions are true, the cell is empty
+        return true;
+        }
+
+        // Check if an array of cells contains a given cell
+        function containsCell(array, cell) {
+        // Check if the array is undefined or null
+        if (!array) {
+            // Return false
+            return false;
+        }
+
+        // Loop through the array
+        for (let i = 0; i < array.length; i++) {
+            // Check if the current cell matches the given cell
+            if (array[i].x == cell.x && array[i].y == cell.y) {
+            // Return true
+            return true;
+            }
+        }
+
+        // If none of the cells match, return false
+        return false;
+        }
+
+        // Grow the blue snake by 1
+        function growSnake() {
+        // Get the last cell of the blue snake array
+        let last = snake[snake.length - 1];
+
+        // Get the second last cell of the blue snake array
+        let secondLast = snake[snake.length - 2];
+
+        // Get the direction of the blue snake's growth
+        // The direction is the opposite of the direction of the last two cells
+        let direction;
+        if (secondLast && last.x == secondLast.x) {
+            if (last.y > secondLast.y) {
+            direction = "up";
+            } else {
+            direction = "down";
+            }
+        } else {
+            if (secondLast && last.x > secondLast.x) {
+            direction = "left";
+            } else {
+            direction = "right";
+            }
+        }
+
+        // Get the new cell of the blue snake's growth according to the direction
+        let newCell;
+        if (direction == "left") {
+            newCell = { x: last.x - 1, y: last.y };
+        } else if (direction == "right") {
+            newCell = { x: last.x + 1, y: last.y };
+        } else if (direction == "up") {
+            newCell = { x: last.x, y: last.y - 1 };
+        } else if (direction == "down") {
+            newCell = { x: last.x, y: last.y + 1 };
+        }
+
+        // Add the new cell to the end of the blue snake array
+        snake.push(newCell);
+        }
+
+        // Grow the red snakes by 1
+        function growEnemies() {
+        // Loop through the enemies array
+        for (let i = 0; i < enemies.length; i++) {
+            // Get the current enemy
+            let enemy = enemies[i];
+
+            // Get the last cell of the current enemy array
+            let last = enemy[enemy.length - 1];
+
+            // Get the second last cell of the current enemy array
+            let secondLast = enemy[enemy.length - 2];
+
+            // Get the direction of the current enemy's growth
+            // The direction is the opposite of the direction of the last two cells
+            let direction;
+            if (secondLast && last.x == secondLast.x) {
+                if (last.y > secondLast.y) {
+                    direction = "up";
+                } else {
+                    direction = "down";
+                }
+            } else {
+                if (secondLast && last.x > secondLast.x) {
+                    direction = "left";
+                } else {
+                    direction = "right";
+                }
+            }
+
+            // Get the new cell of the current enemy's growth according to the direction
+            let newCell;
+            if (direction == "left") {
+            newCell = { x: last.x - 1, y: last.y };
+            } else if (direction == "right") {
+            newCell = { x: last.x + 1, y: last.y };
+            } else if (direction == "up") {
+            newCell = { x: last.x, y: last.y - 1 };
+            } else if (direction == "down") {
+            newCell = { x: last.x, y: last.y + 1 };
+            }
+
+            // Add the new cell to the end of the current enemy array
+            enemy.push(newCell);
+        }
+        }
+
+        // Start the game
+        init();
+
+  </script>
+</body>
+</html>
